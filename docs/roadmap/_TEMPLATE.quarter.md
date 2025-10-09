@@ -8,7 +8,7 @@
 - ?? Done  ?? In Progress  ?? Ready  ?? Blocked  ? Backlog
 ---
 ## Epics & Key Work
-### {{KEY}} – {{Epic name}}
+### {{KEY}} â€“ {{Epic name}}
 - **Outcome:** (user-visible value)
 - **Links:** issue #, PR #, design doc
 - **Owner:** @handle

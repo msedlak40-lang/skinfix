@@ -1,12 +1,11 @@
 ﻿site_name: SkinFix Roadmap & Docs
-docs_dir: .
 nav:
-  - Home: README.md
+  - Home: index.md
   - Roadmap:
       - 2025 Q4: roadmap/2025Q4.md
   - ADRs:
-      - HIPAA Split (0001): docs/adrs/0001-hipaa-split.md
-  - Working Agreement: docs/working-agreement.md
+      - HIPAA Split (0001): adrs/0001-hipaa-split.md
+  - Working Agreement: working-agreement.md
 theme:
   name: material
   features:
