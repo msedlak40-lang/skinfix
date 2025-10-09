@@ -1,4 +1,4 @@
-# ADR 0001 – HIPAA Split Enforcement
+# ADR 0001 â€“ HIPAA Split Enforcement
 - **Date:** 2025-10-08
 - **Status:** Accepted
 - **Context:** Separation of PHI (AWS enclave) and non-PHI (Supabase).

@@ -1,5 +1,5 @@
-site_name: SkinFix Roadmap & Docs
-repo_url: https://github.com/msedlak40-lang/ops-and-product
+﻿site_name: SkinFix Roadmap & Docs
+docs_dir: .
 nav:
   - Home: README.md
   - Roadmap:
