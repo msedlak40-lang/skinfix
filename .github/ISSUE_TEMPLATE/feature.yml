@@ -1,0 +1,18 @@
+name: Feature request
+description: Propose a work item for the roadmap
+labels: [feature]
+body:
+  - type: input
+    id: outcome
+    attributes:
+      label: Outcome
+      description: User-visible value
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope
+  - type: dropdown
+    id: status
+    attributes:
+      label: Status
+      options: [? Backlog, ?? Ready, ?? In Progress, ?? Blocked]

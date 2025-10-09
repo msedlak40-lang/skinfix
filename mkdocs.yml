@@ -1,0 +1,18 @@
+site_name: SkinFix Roadmap & Docs
+repo_url: https://github.com/msedlak40-lang/ops-and-product
+nav:
+  - Home: README.md
+  - Roadmap:
+      - 2025 Q4: roadmap/2025Q4.md
+  - ADRs:
+      - HIPAA Split (0001): docs/adrs/0001-hipaa-split.md
+  - Working Agreement: docs/working-agreement.md
+theme:
+  name: material
+  features:
+    - navigation.sections
+    - content.code.copy
+markdown_extensions:
+  - admonition
+  - toc:
+      permalink: true

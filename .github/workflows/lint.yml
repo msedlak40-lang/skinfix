@@ -1,0 +1,10 @@
+name: Lint Markdown
+on: [push, pull_request]
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: npm init -y
+      - run: npm install --save-dev markdownlint-cli
+      - run: npx markdownlint "**/*.md" --ignore node_modules
