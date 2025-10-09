@@ -1,0 +1,5 @@
+name = "appointments-hooks"
+verify_jwt = false
+
+[experimental]
+edge_runtime = "deno"

@@ -1,0 +1,5 @@
+name = "canva-handoff"
+verify_jwt = false
+
+[experimental]
+edge_runtime = "deno"

@@ -1,0 +1,13 @@
+name = "reviews-pull"
+verify_jwt = false
+
+[env]
+# Optional: if you plan to pull from provider
+GOOGLE_PLACE_ID = "PLACE_ID_GOES_HERE"
+
+# Run hourly (cron is optional; you can use webhook-only mode)
+[experimental]
+edge_runtime = "deno"
+
+[functions.reviews-pull.schedules]
+every_hour = { cron = "0 * * * *" }

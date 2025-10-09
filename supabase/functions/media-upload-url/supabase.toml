@@ -1,0 +1,5 @@
+name = "media-upload-url"
+verify_jwt = false
+
+[experimental]
+edge_runtime = "deno"

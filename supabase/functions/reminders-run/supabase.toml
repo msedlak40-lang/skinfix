@@ -1,0 +1,5 @@
+name = "reminders-run"
+verify_jwt = false
+
+[experimental]
+edge_runtime = "deno"

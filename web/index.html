@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Skin Fix — Staff Tools</title>
+
+  <link rel="stylesheet" href="/style.css" />
+  <link rel="manifest" href="/manifest.webmanifest" type="application/manifest+json" />
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/icon-dark-192.png" />
+  <link rel="apple-touch-icon" href="/assets/icon-dark-192.png" />
+  <meta name="theme-color" content="#0b0b0c" />
+</head>
+
+<!-- Supabase JS (must load before app.js) -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="./app.js" defer></script>
+
+<body>
+  <header class="topbar">
+    <img src="/assets/logo-skinfix-dark.svg" class="logo" id="logoDark"  alt="Skin Fix">
+    <img src="/assets/logo-skinfix-onwhite.svg" class="logo hidden" id="logoLight" alt="Skin Fix">
+
+    <div class="spacer"></div>
+
+    <!-- Minimal auth bar (Magic Link) -->
+    <div id="authBar" style="display:flex;gap:.5rem;align-items:center;margin-right:.5rem;">
+      <span id="authStatus" style="opacity:.8">Not signed in</span>
+      <input id="authEmail" type="email" placeholder="staff email" style="max-width:220px" />
+      <button id="btnMagic" class="btn">Send magic link</button>
+      <button id="btnSignOut" class="btn" style="display:none;">Sign out</button>
+    </div>
+
+    <button id="themeToggle" class="btn">Toggle Theme</button>
+  </header>
+
+  <main class="container">
+
+    <!-- Front Desk: Credits (unchanged) -->
+    <div class="card">
+      <h2>Front Desk — Membership Credits</h2>
+
+      <div class="row">
+        <label>Phone (E.164)</label>
+        <input id="fdPhone" placeholder="+15555550123" />
+        <button id="fdCheckinBtn" class="btn">Check-in</button>
+      </div>
+
+      <div class="row">
+        <label>Perk</label>
+        <select id="fdPerk" class="btn" style="min-width:220px"></select>
+        <button id="fdBalancesBtn" class="btn">Get Balances</button>
+        <button id="fdRedeemBtn" class="btn accent">Redeem 1</button>
+      </div>
+
+      <div class="row">
+        <input id="fdNote" placeholder="Optional note for this redeem (e.g., birthday comp)" style="min-width:420px" />
+      </div>
+
+      <pre id="fdOut" class="output">{}</pre>
+      <div id="fdErr" class="err"></div>
+    </div>
+
+    <!-- QR / Scan: Redeem by cust_id (unchanged) -->
+    <div class="card">
+      <h3>Scan — Redeem by cust_id</h3>
+      <div class="row">
+        <input id="qrCustId" placeholder="cust_id from QR" style="min-width:420px" />
+        <button id="qrRedeemBtn" class="btn accent">Redeem 1</button>
+      </div>
+      <small>Tip: Your QR can open this page with <code>?cust_id=&lt;uuid&gt;</code>.</small>
+    </div>
+
+    <!-- Duplicate warning + merge -->
+    <div id="dupRow" class="row" style="display:none">
+      <div id="dupWarn" class="warn">Duplicate contacts share this phone.</div>
+      <button id="mergeBtn" class="btn accent">Merge</button>
+    </div>
+
+    <!-- Redemptions Audit (placeholder) -->
+    <div class="card">
+      <h3>Recent Redemptions</h3>
+      <div class="row">
+        <button id="auditRefresh" class="btn">Refresh</button>
+      </div>
+      <pre id="auditOut" class="output">{}</pre>
+    </div>
+
+    <!-- QR link helpers (optional) -->
+    <div class="row">
+      <button id="fdCopyQRBtn" class="btn">Copy QR Link</button>
+      <input id="fdQR" readonly placeholder="QR link will appear here" style="min-width:420px" />
+    </div>
+
+    <div class="row">
+      <button id="fdShowQRBtn" class="btn">Show QR</button>
+      <img id="fdQRImg" alt="QR code" style="display:none; width:220px; height:220px; border-radius:10px; border:1px solid var(--border);" />
+      <a id="fdQRDownload" class="btn" style="display:none" download="skinfix-qr.png">Download QR</a>
+    </div>
+
+    <!-- Upload to HIPAA S3 -->
+    <section class="card">
+      <h2>Upload test file → HIPAA S3</h2>
+
+      <div class="row" style="gap:.5rem;align-items:center">
+        <label>cust_id</label>
+        <input id="upCust" placeholder="TESTCUST123" />
+        <button id="btnScanQR" class="btn">Scan QR</button>
+      </div>
+
+      <div class="row">
+        <label>File</label>
+        <input id="upFile" type="file" />
+      </div>
+
+      <button id="upBtn" class="btn">Upload</button>
+
+      <pre id="upOut" class="mono small"></pre>
+      <div id="upErr" class="err"></div>
+    </section>
+
+  </main>
+
+  <footer class="footer">
+    <small>Skin Fix Staff Tools</small>
+  </footer>
+
+  <!-- QR Scanner modal -->
+  <div id="qrScanModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.6); align-items:center; justify-content:center;">
+    <div style="background:#111; color:#fff; padding:16px; border-radius:12px; width:min(90vw,520px);">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px;">
+        <strong>Scan a patient QR</strong>
+        <button id="qrScanClose" class="btn">Close</button>
+      </div>
+      <video id="qrVideo" autoplay playsinline style="width:100%; border-radius:8px; background:#000;"></video>
+      <div id="qrHint" style="opacity:.8; font-size:.9rem; margin-top:8px;">Point camera at QR…</div>
+    </div>
+  </div>
+
+  <!-- ZXing (barcode/QR) -->
+  <script src="https://cdn.jsdelivr.net/npm/@zxing/browser@0.1.5/umd/zxing-browser.min.js"></script>
+</body>
+</html>
