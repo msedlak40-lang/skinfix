@@ -1,0 +1,13 @@
+# env files anywhere
+.env
+.env.*
+*.env
+
+# keys/certs
+*.key
+*.pem
+*.p12
+*.pfx
+*.crt
+*.cer
+*.der
