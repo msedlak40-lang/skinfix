@@ -1,8 +1,7 @@
-# env files anywhere
+# env files
 .env
 .env.*
 *.env
-
 # keys/certs
 *.key
 *.pem
