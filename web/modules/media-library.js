@@ -7,9 +7,7 @@ import api from '../shared/api.js';
 import utils from '../shared/utils.js';
 import components from '../shared/components.js';
 
-let approved
-
-Encounters = [];
+let approvedEncounters = [];
 let currentFilter = { treatment_id: null, published: null };
 
 export async function render() {
