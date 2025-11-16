@@ -26,10 +26,67 @@ export async function render() {
     <!-- Customer Selection -->
     <div class="card">
       <h3>1. Select Customer</h3>
-      ${components.createCustomerSearch((customer) => {
-        selectedCustomer = customer;
-        updateUI();
-      })}
+      <div class="customer-search">
+        <input
+          id="customerSearchInput"
+          type="text"
+          placeholder="Search by name or phone..."
+          autocomplete="off"
+          style="width: 100%;"
+        />
+        <div id="customerSearchResults" style="
+          position: absolute;
+          background: var(--card);
+          border: 1px solid var(--border);
+          border-radius: 10px;
+          margin-top: 4px;
+          max-height: 300px;
+          overflow-y: auto;
+          display: none;
+          z-index: 100;
+          width: calc(100% - 32px);
+        "></div>
+      </div>
+
+      <div id="selectedCustomer" style="display: none; margin-top: 12px;">
+        <div style="
+          background: var(--card);
+          border: 1px solid var(--border);
+          border-radius: 10px;
+          padding: 12px;
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+        ">
+          <div>
+            <strong id="selectedCustomerName"></strong>
+            <div style="font-size: 14px; color: var(--muted);" id="selectedCustomerPhone"></div>
+          </div>
+          <button id="clearCustomer" class="btn" style="padding: 6px 12px;">Change</button>
+        </div>
+      </div>
+
+      <div id="newCustomerForm" style="display: none; margin-top: 12px;">
+        <div class="card" style="padding: 16px;">
+          <h4>New Customer</h4>
+          <div class="row">
+            <label>Name</label>
+            <input id="newCustomerName" type="text" required />
+          </div>
+          <div class="row">
+            <label>Phone</label>
+            <input id="newCustomerPhone" type="tel" placeholder="+15555550123" required />
+          </div>
+          <div class="row">
+            <label>Email (optional)</label>
+            <input id="newCustomerEmail" type="email" />
+          </div>
+          <div class="row">
+            <button id="saveNewCustomer" class="btn accent">Create Customer</button>
+            <button id="cancelNewCustomer" class="btn">Cancel</button>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- Treatment Selection -->
@@ -172,7 +229,120 @@ export async function render() {
 }
 
 export function init() {
+  setupCustomerSearch();
   setupEventListeners();
+}
+
+function setupCustomerSearch() {
+  const searchInput = document.getElementById('customerSearchInput');
+  const resultsDiv = document.getElementById('customerSearchResults');
+  const selectedDiv = document.getElementById('selectedCustomer');
+  const newCustomerForm = document.getElementById('newCustomerForm');
+
+  if (!searchInput) return;
+
+  // Debounced search
+  const performSearch = utils.debounce(async (query) => {
+    if (query.length < 2) {
+      resultsDiv.style.display = 'none';
+      return;
+    }
+
+    try {
+      const customers = await api.searchCustomers(query);
+
+      if (customers.length === 0) {
+        resultsDiv.innerHTML = `
+          <div style="padding: 12px; cursor: pointer;" id="addNewCustomer">
+            <strong>+ Add "${utils.escapeHTML(query)}" as new customer</strong>
+          </div>
+        `;
+      } else {
+        resultsDiv.innerHTML = customers.map(c => `
+          <div class="customer-result" data-cust-id="${c.cust_id}" style="
+            padding: 12px;
+            cursor: pointer;
+            border-bottom: 1px solid var(--border);
+          " data-customer='${JSON.stringify(c)}'>
+            <strong>${utils.escapeHTML(c.name)}</strong>
+            <div style="font-size: 14px; color: var(--muted);">${utils.formatPhone(c.phone)}</div>
+          </div>
+        `).join('');
+
+        // Add click handlers to results
+        document.querySelectorAll('.customer-result').forEach(el => {
+          el.addEventListener('click', () => {
+            const customer = JSON.parse(el.getAttribute('data-customer'));
+            selectCustomer(customer);
+          });
+        });
+      }
+
+      resultsDiv.style.display = 'block';
+
+      // Handle "add new customer" click
+      document.getElementById('addNewCustomer')?.addEventListener('click', () => {
+        resultsDiv.style.display = 'none';
+        newCustomerForm.style.display = 'block';
+        document.getElementById('newCustomerName').value = query;
+      });
+
+    } catch (error) {
+      console.error('Customer search error:', error);
+      utils.toast('Failed to search customers: ' + error.message, 'error');
+    }
+  }, 300);
+
+  searchInput.addEventListener('input', (e) => {
+    performSearch(e.target.value.trim());
+  });
+
+  // Clear customer
+  document.getElementById('clearCustomer')?.addEventListener('click', () => {
+    selectedCustomer = null;
+    searchInput.value = '';
+    selectedDiv.style.display = 'none';
+    searchInput.parentElement.style.display = 'block';
+    updateUI();
+  });
+
+  // Save new customer
+  document.getElementById('saveNewCustomer')?.addEventListener('click', async () => {
+    const name = document.getElementById('newCustomerName').value.trim();
+    const phone = document.getElementById('newCustomerPhone').value.trim();
+    const email = document.getElementById('newCustomerEmail').value.trim();
+
+    if (!name || !phone) {
+      utils.toast('Name and phone are required', 'error');
+      return;
+    }
+
+    try {
+      const newCustomer = await api.createCustomer({ name, phone, email });
+      selectCustomer(newCustomer);
+      newCustomerForm.style.display = 'none';
+      utils.toast('Customer created!', 'success');
+    } catch (error) {
+      console.error('Create customer error:', error);
+      utils.toast('Failed to create customer: ' + error.message, 'error');
+    }
+  });
+
+  // Cancel new customer
+  document.getElementById('cancelNewCustomer')?.addEventListener('click', () => {
+    newCustomerForm.style.display = 'none';
+    searchInput.value = '';
+  });
+
+  function selectCustomer(customer) {
+    selectedCustomer = customer;
+    document.getElementById('selectedCustomerName').textContent = customer.name;
+    document.getElementById('selectedCustomerPhone').textContent = utils.formatPhone(customer.phone);
+    searchInput.parentElement.style.display = 'none';
+    selectedDiv.style.display = 'block';
+    resultsDiv.style.display = 'none';
+    updateUI();
+  }
 }
 
 function setupEventListeners() {
