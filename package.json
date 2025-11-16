@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "Skin Fix Media Service - Staff Tools for Managing Before/After Photos",
   "scripts": {
-    "dev": "npx serve web -p 8000",
+    "dev": "npx serve web -p 8000 --single --no-port-switching",
     "start": "npm run dev"
   },
   "keywords": [
