@@ -1,0 +1,16 @@
+{
+  "name": "skinfix-media-service",
+  "version": "1.0.0",
+  "description": "Skin Fix Media Service - Staff Tools for Managing Before/After Photos",
+  "scripts": {
+    "dev": "npx serve web -p 8000",
+    "start": "npm run dev"
+  },
+  "keywords": [
+    "skinfix",
+    "media",
+    "hipaa"
+  ],
+  "author": "",
+  "license": "ISC"
+}
