@@ -123,3 +123,53 @@ input::placeholder { color: var(--muted); }
   opacity: .96;
   box-shadow: 0 8px 28px rgba(0,0,0,.2);
 }
+
+/* Navigation Tabs */
+.nav-tab {
+  display: inline-block;
+  padding: 14px 20px;
+  color: var(--muted);
+  text-decoration: none;
+  border-bottom: 2px solid transparent;
+  transition: all 0.2s;
+  white-space: nowrap;
+  font-weight: 500;
+}
+
+.nav-tab:hover {
+  color: var(--fg);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.nav-tab.active {
+  color: var(--fg);
+  border-bottom-color: var(--fg);
+}
+
+.light .nav-tab.active {
+  border-bottom-color: #111;
+}
+
+/* Spinner animation */
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Focused encounter item (keyboard navigation) */
+.encounter-item.focused {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
+}
+
+/* Media card hover effect */
+.media-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 32px rgba(0,0,0,.12);
+  transition: all 0.2s;
+}
+
+/* Format option hover effect */
+.export-format-option:has(input:checked) {
+  border-color: #3b82f6;
+  background: rgba(59, 130, 246, 0.05);
+}

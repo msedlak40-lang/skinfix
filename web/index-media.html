@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Skin Fix — Staff Tools</title>
+
+  <link rel="stylesheet" href="/style.css" />
+  <link rel="manifest" href="/manifest.webmanifest" type="application/manifest+json" />
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/icon-dark-192.png" />
+  <link rel="apple-touch-icon" href="/assets/icon-dark-192.png" />
+  <meta name="theme-color" content="#0b0b0c" />
+
+  <!-- Toastify CSS for notifications -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css">
+</head>
+
+<body>
+  <header class="topbar">
+    <img src="/assets/logo-skinfix-dark.svg" class="logo" id="logoDark" alt="Skin Fix">
+    <img src="/assets/logo-skinfix-onwhite.svg" class="logo hidden" id="logoLight" alt="Skin Fix">
+
+    <div class="spacer"></div>
+
+    <!-- Auth bar (Magic Link) -->
+    <div id="authBar" style="display:flex;gap:.5rem;align-items:center;margin-right:.5rem;">
+      <span id="authStatus" style="opacity:.8">Not signed in</span>
+      <input id="authEmail" type="email" placeholder="staff email" style="max-width:220px" />
+      <button id="btnMagic" class="btn">Send magic link</button>
+      <button id="btnSignOut" class="btn" style="display:none;">Sign out</button>
+    </div>
+
+    <button id="themeToggle" class="btn">Toggle Theme</button>
+  </header>
+
+  <!-- Tab Navigation -->
+  <nav style="
+    background: var(--card);
+    border-bottom: 1px solid var(--border);
+    padding: 0 16px;
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    position: sticky;
+    top: 0;
+    z-index: 9;
+  ">
+    <a href="/media/upload" data-route="/media/upload" class="nav-tab">
+      📸 Media Upload
+    </a>
+    <a href="/media/approval" data-route="/media/approval" class="nav-tab">
+      ✅ Approval Queue
+    </a>
+    <a href="/media/library" data-route="/media/library" class="nav-tab">
+      🖼️ Media Library
+    </a>
+    <a href="/reviews" data-route="/reviews" class="nav-tab">
+      ⭐ Reviews
+    </a>
+    <a href="/analytics" data-route="/analytics" class="nav-tab">
+      📊 Analytics
+    </a>
+  </nav>
+
+  <!-- Main Content (Router Target) -->
+  <main class="container" id="appContent">
+    <div class="card">
+      <div style="text-align: center; padding: 40px 20px;">
+        <div style="
+          border: 4px solid var(--border);
+          border-top-color: var(--accent);
+          border-radius: 50%;
+          width: 48px;
+          height: 48px;
+          animation: spin 1s linear infinite;
+          margin: 0 auto 16px;
+        "></div>
+        <p style="color: var(--muted);">Loading...</p>
+      </div>
+    </div>
+  </main>
+
+  <footer class="footer">
+    <small>Skin Fix Staff Tools • Media & Review Management</small>
+  </footer>
+
+  <!-- Supabase JS (must load before app.js) -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <!-- Toastify JS -->
+  <script src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
+
+  <!-- Legacy app.js for auth -->
+  <script>
+    // Initialize Supabase client (from original app.js)
+    const SUPABASE_URL = "https://eufsagjogrwlgarbrsmy.supabase.co";
+    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV1ZnNhZ2pvZ3J3bGdhcmJyc215Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc0OTgwMDcsImV4cCI6MjA3MzA3NDAwN30.h7tuaF3UjwlC0JuEc9OXz025K6CqDyHKZWnSn7PQvIw";
+    const API_BASE = "https://ku3gfs7548.execute-api.us-east-2.amazonaws.com";
+    const BASE_ORIGIN = window.location.origin;
+
+    window.supa = window.supa || (typeof supabase !== "undefined"
+      ? supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+          auth: {
+            persistSession: true,
+            autoRefreshToken: true,
+            detectSessionInUrl: true,
+            flowType: "implicit",
+          },
+        })
+      : null);
+    const supa = window.supa;
+
+    // Auth UI helpers
+    async function refreshAuthUI() {
+      try {
+        const { data: { session } } = await supa.auth.getSession();
+        const authed = !!session?.access_token;
+        const s = document.getElementById("authStatus");
+        const bSignOut = document.getElementById("btnSignOut");
+        const bMagic = document.getElementById("btnMagic");
+        if (s) s.textContent = authed ? "Signed in" : "Not signed in";
+        if (bSignOut) bSignOut.style.display = authed ? "" : "none";
+        if (bMagic) bMagic.style.display = authed ? "none" : "";
+      } catch (e) {
+        console.warn("refreshAuthUI error", e);
+      }
+    }
+
+    supa?.auth.onAuthStateChange((event, session) => {
+      console.log("[auth] event:", event, "hasToken:", !!session?.access_token);
+      refreshAuthUI();
+    });
+
+    // Initial auth check
+    (async () => {
+      await refreshAuthUI();
+      await new Promise((r) => setTimeout(r, 200));
+      const { data: { session } } = await supa.auth.getSession();
+      if (location.hash && (location.hash.includes("access_token") || location.hash.includes("refresh_token"))) {
+        if (session?.access_token) history.replaceState({}, "", location.pathname);
+      }
+      await refreshAuthUI();
+    })();
+
+    // Magic link sender
+    document.getElementById("btnMagic")?.addEventListener("click", async () => {
+      const email = (document.getElementById("authEmail")?.value || "").trim();
+      if (!email) return alert("Enter your staff email");
+      const { error } = await supa.auth.signInWithOtp({
+        email,
+        options: { emailRedirectTo: BASE_ORIGIN },
+      });
+      if (error) return alert(error.message);
+      alert("Magic link sent. Open it in the same browser as this page.");
+    });
+
+    // Sign out
+    document.getElementById("btnSignOut")?.addEventListener("click", async () => {
+      await supa.auth.signOut();
+      await refreshAuthUI();
+    });
+
+    // Theme toggle
+    const themeToggle = document.getElementById('themeToggle');
+    if (themeToggle) {
+      themeToggle.addEventListener('click', () => {
+        document.documentElement.classList.toggle('light');
+        const isDark = !document.documentElement.classList.contains('light');
+        document.getElementById('logoDark').classList.toggle('hidden', !isDark);
+        document.getElementById('logoLight').classList.toggle('hidden', isDark);
+      });
+    }
+  </script>
+
+  <!-- Media Service App (ES6 modules) -->
+  <script type="module" src="/app-media.js"></script>
+</body>
+</html>
