@@ -15,10 +15,10 @@ CREATE TABLE IF NOT EXISTS customers (
 );
 
 -- Index for fast phone lookup
-CREATE INDEX idx_customers_phone ON customers(phone);
+CREATE INDEX IF NOT EXISTS idx_customers_phone ON customers(phone);
 
 -- Index for name search (case-insensitive)
-CREATE INDEX idx_customers_name_lower ON customers(LOWER(name));
+CREATE INDEX IF NOT EXISTS idx_customers_name_lower ON customers(LOWER(name));
 
 -- ============================================================================
 -- 2. TREATMENTS TABLE (Admin-configurable)
@@ -81,13 +81,13 @@ CREATE TABLE IF NOT EXISTS media_encounters (
 );
 
 -- Indexes for common queries
-CREATE INDEX idx_media_encounters_cust_id ON media_encounters(cust_id);
-CREATE INDEX idx_media_encounters_status ON media_encounters(status);
-CREATE INDEX idx_media_encounters_treatment_id ON media_encounters(treatment_id);
-CREATE INDEX idx_media_encounters_date ON media_encounters(encounter_date DESC);
+CREATE INDEX IF NOT EXISTS idx_media_encounters_cust_id ON media_encounters(cust_id);
+CREATE INDEX IF NOT EXISTS idx_media_encounters_status ON media_encounters(status);
+CREATE INDEX IF NOT EXISTS idx_media_encounters_treatment_id ON media_encounters(treatment_id);
+CREATE INDEX IF NOT EXISTS idx_media_encounters_date ON media_encounters(encounter_date DESC);
 
 -- GSI for approval queue
-CREATE INDEX idx_media_encounters_pending_approval ON media_encounters(status, encounter_date DESC)
+CREATE INDEX IF NOT EXISTS idx_media_encounters_pending_approval ON media_encounters(status, encounter_date DESC)
   WHERE status = 'pending_approval';
 
 -- ============================================================================
@@ -116,8 +116,8 @@ CREATE TABLE IF NOT EXISTS media_files (
 );
 
 -- Indexes
-CREATE INDEX idx_media_files_encounter_id ON media_files(encounter_id);
-CREATE INDEX idx_media_files_type ON media_files(file_type);
+CREATE INDEX IF NOT EXISTS idx_media_files_encounter_id ON media_files(encounter_id);
+CREATE INDEX IF NOT EXISTS idx_media_files_type ON media_files(file_type);
 
 -- ============================================================================
 -- 5. PUBLICATIONS TABLE (Track what's been posted to Instagram)
@@ -136,8 +136,8 @@ CREATE TABLE IF NOT EXISTS publications (
 );
 
 -- Index for finding published content
-CREATE INDEX idx_publications_encounter_id ON publications(encounter_id);
-CREATE INDEX idx_publications_date ON publications(published_at DESC);
+CREATE INDEX IF NOT EXISTS idx_publications_encounter_id ON publications(encounter_id);
+CREATE INDEX IF NOT EXISTS idx_publications_date ON publications(published_at DESC);
 
 -- ============================================================================
 -- 6. ROW LEVEL SECURITY (RLS) POLICIES
@@ -151,70 +151,83 @@ ALTER TABLE media_files ENABLE ROW LEVEL SECURITY;
 ALTER TABLE publications ENABLE ROW LEVEL SECURITY;
 
 -- Customers: Authenticated users can read/write (staff only)
+DROP POLICY IF EXISTS "Authenticated users can view customers" ON customers;
 CREATE POLICY "Authenticated users can view customers"
   ON customers FOR SELECT
   TO authenticated
   USING (true);
 
+DROP POLICY IF EXISTS "Authenticated users can insert customers" ON customers;
 CREATE POLICY "Authenticated users can insert customers"
   ON customers FOR INSERT
   TO authenticated
   WITH CHECK (true);
 
+DROP POLICY IF EXISTS "Authenticated users can update customers" ON customers;
 CREATE POLICY "Authenticated users can update customers"
   ON customers FOR UPDATE
   TO authenticated
   USING (true);
 
 -- Treatments: Anyone can read, only service_role can write
+DROP POLICY IF EXISTS "Anyone can view active treatments" ON treatments;
 CREATE POLICY "Anyone can view active treatments"
   ON treatments FOR SELECT
   TO authenticated
   USING (active = true);
 
+DROP POLICY IF EXISTS "Service role can manage treatments" ON treatments;
 CREATE POLICY "Service role can manage treatments"
   ON treatments FOR ALL
   TO service_role
   USING (true);
 
 -- Media Encounters: Authenticated users full access
+DROP POLICY IF EXISTS "Authenticated users can view encounters" ON media_encounters;
 CREATE POLICY "Authenticated users can view encounters"
   ON media_encounters FOR SELECT
   TO authenticated
   USING (true);
 
+DROP POLICY IF EXISTS "Authenticated users can insert encounters" ON media_encounters;
 CREATE POLICY "Authenticated users can insert encounters"
   ON media_encounters FOR INSERT
   TO authenticated
   WITH CHECK (true);
 
+DROP POLICY IF EXISTS "Authenticated users can update encounters" ON media_encounters;
 CREATE POLICY "Authenticated users can update encounters"
   ON media_encounters FOR UPDATE
   TO authenticated
   USING (true);
 
 -- Media Files: Authenticated users full access
+DROP POLICY IF EXISTS "Authenticated users can view media files" ON media_files;
 CREATE POLICY "Authenticated users can view media files"
   ON media_files FOR SELECT
   TO authenticated
   USING (true);
 
+DROP POLICY IF EXISTS "Authenticated users can insert media files" ON media_files;
 CREATE POLICY "Authenticated users can insert media files"
   ON media_files FOR INSERT
   TO authenticated
   WITH CHECK (true);
 
+DROP POLICY IF EXISTS "Authenticated users can update media files" ON media_files;
 CREATE POLICY "Authenticated users can update media files"
   ON media_files FOR UPDATE
   TO authenticated
   USING (true);
 
 -- Publications: Authenticated users full access
+DROP POLICY IF EXISTS "Authenticated users can view publications" ON publications;
 CREATE POLICY "Authenticated users can view publications"
   ON publications FOR SELECT
   TO authenticated
   USING (true);
 
+DROP POLICY IF EXISTS "Authenticated users can insert publications" ON publications;
 CREATE POLICY "Authenticated users can insert publications"
   ON publications FOR INSERT
   TO authenticated
@@ -234,12 +247,15 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- Triggers for updated_at
+DROP TRIGGER IF EXISTS update_customers_updated_at ON customers;
 CREATE TRIGGER update_customers_updated_at BEFORE UPDATE ON customers
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_treatments_updated_at ON treatments;
 CREATE TRIGGER update_treatments_updated_at BEFORE UPDATE ON treatments
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_media_encounters_updated_at ON media_encounters;
 CREATE TRIGGER update_media_encounters_updated_at BEFORE UPDATE ON media_encounters
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
