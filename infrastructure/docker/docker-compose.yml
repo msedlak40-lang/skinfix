@@ -1,0 +1,61 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: medspa-seo-db
+    environment:
+      POSTGRES_USER: medspa_dev
+      POSTGRES_PASSWORD: dev_password_123
+      POSTGRES_DB: medspa_seo_dev
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U medspa_dev"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - medspa-network
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: medspa-seo-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - medspa-network
+
+  # Database Admin UI (optional, convenient for development)
+  adminer:
+    image: adminer
+    container_name: medspa-seo-adminer
+    ports:
+      - "8080:8080"
+    depends_on:
+      - postgres
+    networks:
+      - medspa-network
+    environment:
+      ADMINER_DEFAULT_SERVER: postgres
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  medspa-network:
+    driver: bridge

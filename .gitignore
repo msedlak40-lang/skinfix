@@ -2,6 +2,10 @@
 .env
 .env.*
 *.env
+!.env.example
+backend/.env
+dashboard/.env.local
+
 # keys/certs
 *.key
 *.pem
@@ -10,3 +14,46 @@
 *.crt
 *.cer
 *.der
+
+# Backend (Python)
+backend/__pycache__/
+backend/**/__pycache__/
+backend/*.pyc
+backend/**/*.pyc
+backend/venv/
+backend/.pytest_cache/
+backend/.mypy_cache/
+backend/.coverage
+backend/htmlcov/
+backend/*.egg-info/
+
+# Dashboard (Next.js)
+dashboard/.next/
+dashboard/out/
+dashboard/node_modules/
+dashboard/.turbo/
+dashboard/dist/
+
+# WordPress Plugin
+wordpress-plugin/node_modules/
+wordpress-plugin/vendor/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*.swn
+.DS_Store
+
+# OS
+.DS_Store
+Thumbs.db
+*.log
+
+# Docker
+infrastructure/docker/.env
+
+# Secrets
+secrets/
+*.secret
