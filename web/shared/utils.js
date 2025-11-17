@@ -106,6 +106,42 @@ export function formatPhone(phone) {
   return phone; // Return as-is if can't format
 }
 
+// Auto-format phone number as user types
+export function autoFormatPhone(inputElement) {
+  if (!inputElement) return;
+
+  inputElement.addEventListener('input', (e) => {
+    const input = e.target;
+    const cursorPos = input.selectionStart;
+    const oldLength = input.value.length;
+
+    // Remove all non-digits
+    const cleaned = input.value.replace(/\D/g, '');
+
+    // Format based on length
+    let formatted = '';
+    if (cleaned.length === 0) {
+      formatted = '';
+    } else if (cleaned.length <= 3) {
+      formatted = `(${cleaned}`;
+    } else if (cleaned.length <= 6) {
+      formatted = `(${cleaned.slice(0, 3)}) ${cleaned.slice(3)}`;
+    } else if (cleaned.length <= 10) {
+      formatted = `(${cleaned.slice(0, 3)}) ${cleaned.slice(3, 6)}-${cleaned.slice(6, 10)}`;
+    } else {
+      // Limit to 10 digits for US numbers
+      formatted = `(${cleaned.slice(0, 3)}) ${cleaned.slice(3, 6)}-${cleaned.slice(6, 10)}`;
+    }
+
+    input.value = formatted;
+
+    // Adjust cursor position
+    const newLength = formatted.length;
+    const diff = newLength - oldLength;
+    input.setSelectionRange(cursorPos + diff, cursorPos + diff);
+  });
+}
+
 // Debounce function (for search inputs)
 export function debounce(fn, delay = 300) {
   let timeout;

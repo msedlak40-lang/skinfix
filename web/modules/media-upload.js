@@ -92,8 +92,33 @@ export async function render() {
     <!-- Treatment Selection -->
     <div class="card" id="treatmentSection" style="display: none;">
       <h3>2. Select Treatment</h3>
-      <div class="row">
+      <div class="row" style="gap: 12px; align-items: center;">
         ${treatmentSelectHTML}
+        <button id="addTreatmentBtn" class="btn" style="white-space: nowrap;">+ Add Treatment</button>
+      </div>
+
+      <!-- New Treatment Form -->
+      <div id="newTreatmentForm" style="display: none; margin-top: 16px; padding: 16px; background: var(--card); border: 1px solid var(--border); border-radius: 10px;">
+        <h4>Add New Treatment</h4>
+        <div class="row">
+          <label>Treatment Name</label>
+          <input id="newTreatmentName" type="text" placeholder="e.g., Dermaplaning" required />
+        </div>
+        <div class="row">
+          <label>Results Timing</label>
+          <select id="newTreatmentTiming" class="btn">
+            <option value="immediate">Immediate (results show right away)</option>
+            <option value="delayed">Delayed (results take time to appear)</option>
+          </select>
+        </div>
+        <div class="row" id="delayDaysRow" style="display: none;">
+          <label>Days Until Results Show</label>
+          <input id="newTreatmentDelayDays" type="number" min="1" max="30" value="7" />
+        </div>
+        <div class="row" style="gap: 12px;">
+          <button id="saveTreatment" class="btn accent">Create Treatment</button>
+          <button id="cancelTreatment" class="btn">Cancel</button>
+        </div>
       </div>
     </div>
 
@@ -285,6 +310,13 @@ function setupCustomerSearch() {
         resultsDiv.style.display = 'none';
         newCustomerForm.style.display = 'block';
         document.getElementById('newCustomerName').value = query;
+
+        // Auto-format phone number
+        const phoneInput = document.getElementById('newCustomerPhone');
+        if (phoneInput && !phoneInput.hasAttribute('data-formatted')) {
+          utils.autoFormatPhone(phoneInput);
+          phoneInput.setAttribute('data-formatted', 'true');
+        }
       });
 
     } catch (error) {
@@ -354,6 +386,75 @@ function setupEventListeners() {
       updateUI();
     });
   }
+
+  // Add treatment button
+  const addTreatmentBtn = document.getElementById('addTreatmentBtn');
+  const newTreatmentForm = document.getElementById('newTreatmentForm');
+  const newTreatmentTiming = document.getElementById('newTreatmentTiming');
+  const delayDaysRow = document.getElementById('delayDaysRow');
+
+  if (addTreatmentBtn) {
+    addTreatmentBtn.addEventListener('click', () => {
+      newTreatmentForm.style.display = 'block';
+    });
+  }
+
+  if (newTreatmentTiming) {
+    newTreatmentTiming.addEventListener('change', (e) => {
+      delayDaysRow.style.display = e.target.value === 'delayed' ? 'flex' : 'none';
+    });
+  }
+
+  // Save new treatment
+  document.getElementById('saveTreatment')?.addEventListener('click', async () => {
+    const name = document.getElementById('newTreatmentName').value.trim();
+    const timing = document.getElementById('newTreatmentTiming').value;
+    const delayDays = document.getElementById('newTreatmentDelayDays').value;
+
+    if (!name) {
+      utils.toast('Treatment name is required', 'error');
+      return;
+    }
+
+    try {
+      const newTreatment = await api.createTreatment({
+        name,
+        results_timing: timing,
+        results_delay_days: timing === 'delayed' ? parseInt(delayDays) : 0,
+        review_delay_days: timing === 'delayed' ? parseInt(delayDays) : 1
+      });
+
+      // Refresh treatment dropdown
+      const treatmentSection = document.getElementById('treatmentSection');
+      const container = treatmentSection.querySelector('.row');
+      const newSelect = await components.createTreatmentSelect(newTreatment.treatment_id);
+      container.querySelector('select').outerHTML = newSelect;
+
+      // Re-setup listener
+      const updatedSelect = document.getElementById('treatmentSelect');
+      if (updatedSelect) {
+        selectedTreatment = newTreatment.treatment_id;
+        updatedSelect.addEventListener('change', (e) => {
+          selectedTreatment = e.target.value;
+          updateUI();
+        });
+      }
+
+      newTreatmentForm.style.display = 'none';
+      document.getElementById('newTreatmentName').value = '';
+      utils.toast(`Treatment "${name}" created!`, 'success');
+      updateUI();
+    } catch (error) {
+      console.error('Create treatment error:', error);
+      utils.toast('Failed to create treatment: ' + error.message, 'error');
+    }
+  });
+
+  // Cancel new treatment
+  document.getElementById('cancelTreatment')?.addEventListener('click', () => {
+    newTreatmentForm.style.display = 'none';
+    document.getElementById('newTreatmentName').value = '';
+  });
 
   // Consent checkbox
   const consentCheckbox = document.getElementById('consentCheckbox');
