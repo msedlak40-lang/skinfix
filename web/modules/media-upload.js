@@ -15,6 +15,59 @@ let afterPhotos = [];
 let currentEncounterId = null;
 let isAddingAfterPhotos = false; // Flag to indicate we're adding after photos to existing encounter
 
+// State management
+const STATE_KEY = 'mediaUploadState';
+
+function saveState() {
+  try {
+    const state = {
+      selectedCustomer,
+      selectedTreatment,
+      consentConfirmed,
+      beforePhotos: beforePhotos.map(p => ({ url: p.url, width: p.width, height: p.height, size: p.size, id: p.id })),
+      afterPhotos: afterPhotos.map(p => ({ url: p.url, width: p.width, height: p.height, size: p.size, id: p.id })),
+      currentEncounterId,
+      isAddingAfterPhotos,
+      timestamp: Date.now()
+    };
+    sessionStorage.setItem(STATE_KEY, JSON.stringify(state));
+  } catch (err) {
+    console.warn('Failed to save state:', err);
+  }
+}
+
+function loadState() {
+  try {
+    const stored = sessionStorage.getItem(STATE_KEY);
+    if (!stored) return false;
+
+    const state = JSON.parse(stored);
+
+    // Only restore if less than 30 minutes old
+    if (Date.now() - state.timestamp > 30 * 60 * 1000) {
+      clearState();
+      return false;
+    }
+
+    selectedCustomer = state.selectedCustomer;
+    selectedTreatment = state.selectedTreatment;
+    consentConfirmed = state.consentConfirmed;
+    beforePhotos = state.beforePhotos || [];
+    afterPhotos = state.afterPhotos || [];
+    currentEncounterId = state.currentEncounterId;
+    isAddingAfterPhotos = state.isAddingAfterPhotos || false;
+
+    return true;
+  } catch (err) {
+    console.warn('Failed to load state:', err);
+    return false;
+  }
+}
+
+function clearState() {
+  sessionStorage.removeItem(STATE_KEY);
+}
+
 export async function render() {
   const treatmentSelectHTML = await components.createTreatmentSelect();
 
@@ -278,6 +331,47 @@ export async function render() {
 export function init() {
   setupCustomerSearch();
   setupEventListeners();
+
+  // Restore state if available
+  const stateRestored = loadState();
+  if (stateRestored) {
+    // Restore UI based on loaded state
+    if (selectedCustomer) {
+      document.getElementById('selectedCustomerName').textContent = selectedCustomer.name;
+      document.getElementById('selectedCustomerPhone').textContent = utils.formatPhone(selectedCustomer.phone);
+      document.getElementById('customerSearchInput').parentElement.style.display = 'none';
+      document.getElementById('selectedCustomer').style.display = 'block';
+
+      // Load pending encounters for this customer
+      loadPendingEncounters(selectedCustomer.cust_id);
+    }
+
+    if (selectedTreatment) {
+      const treatmentSelect = document.getElementById('treatmentSelect');
+      if (treatmentSelect) {
+        treatmentSelect.value = selectedTreatment;
+      }
+    }
+
+    if (consentConfirmed) {
+      const consentCheckbox = document.getElementById('consentCheckbox');
+      if (consentCheckbox) {
+        consentCheckbox.checked = true;
+      }
+    }
+
+    // Restore photo grids
+    if (beforePhotos.length > 0) {
+      renderPhotoGrid('before');
+    }
+    if (afterPhotos.length > 0) {
+      renderPhotoGrid('after');
+    }
+
+    utils.toast('Upload session restored', 'info');
+  }
+
+  updateUI();
 }
 
 function setupCustomerSearch() {
@@ -879,6 +973,9 @@ async function handleSaveBeforePhotos() {
 
       utils.toast(`Before photos saved! Come back later to add after photos.`, 'success');
 
+      // Clear saved state
+      clearState();
+
       // Reset form
       setTimeout(() => {
         window.router.navigate('/media/upload');
@@ -974,6 +1071,9 @@ async function handleSubmitForApproval() {
 
         utils.toast(`${beforePhotos.length + afterPhotos.length} photos submitted for approval!`, 'success');
       }
+
+      // Clear saved state
+      clearState();
 
       // Reset form
       setTimeout(() => {
@@ -1090,6 +1190,9 @@ function updateUI() {
       }
     }
   }
+
+  // Save state whenever UI updates
+  saveState();
 }
 
 export default { render, init };
