@@ -128,7 +128,7 @@ class API {
   // CONSENTS
   // ============================================================================
 
-  async createConsent({ cust_id, staff_user, method = 'digital', consent_type = 'marketing', source = 'emr', channel = 'in_person' }) {
+  async createConsent({ cust_id, staff_user, method = 'digital', consent_type = 'media_release', source = 'emr', channel = 'in_person' }) {
     const { data, error } = await this.supabase
       .from('consents')
       .insert({
@@ -147,7 +147,7 @@ class API {
     return data;
   }
 
-  async getCustomerConsent(cust_id, consent_type = 'marketing') {
+  async getCustomerConsent(cust_id, consent_type = 'media_release') {
     const { data, error } = await this.supabase
       .from('consents')
       .select('*')

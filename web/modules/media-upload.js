@@ -10,8 +10,8 @@ import components from '../shared/components.js';
 let selectedCustomer = null;
 let selectedTreatment = null;
 let consentConfirmed = false;
-let beforePhoto = null;
-let afterPhoto = null;
+let beforePhotos = [];
+let afterPhotos = [];
 let currentEncounterId = null;
 
 export async function render() {
@@ -156,34 +156,40 @@ export async function render() {
     <div class="card" id="photoSection" style="display: none;">
       <h3>4. Take Photos</h3>
 
-      <!-- Before Photo -->
-      <div style="margin-bottom: 24px;">
-        <h4 style="margin-bottom: 12px;">Before Photo</h4>
-        <div id="beforePhotoPreview" style="display: none; margin-bottom: 12px;">
-          <img id="beforePhotoImg" style="max-width: 100%; max-height: 300px; border-radius: 10px; border: 1px solid var(--border);" />
-          <div style="margin-top: 8px; font-size: 14px; color: var(--muted);" id="beforePhotoInfo"></div>
+      <!-- Before Photos -->
+      <div style="margin-bottom: 32px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+          <h4 style="margin: 0;">Before Photos (<span id="beforePhotoCount">0</span>)</h4>
+          <div style="display: flex; gap: 8px;">
+            <button id="takeBeforePhoto" class="btn accent" style="padding: 8px 16px;">📷 Take Photo</button>
+            <button id="uploadBeforePhoto" class="btn" style="padding: 8px 16px;">📁 Upload</button>
+          </div>
         </div>
-        <div class="row">
-          <button id="takeBeforePhoto" class="btn accent">📷 Take Before Photo</button>
-          <button id="uploadBeforePhoto" class="btn">📁 Upload from Gallery</button>
-          <button id="clearBeforePhoto" class="btn" style="display: none;">✕ Clear</button>
-        </div>
-        <input type="file" id="beforePhotoInput" accept="image/*" style="display: none;" />
+        <div id="beforePhotosGrid" style="
+          display: grid;
+          grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+          gap: 12px;
+          margin-top: 12px;
+        "></div>
+        <input type="file" id="beforePhotoInput" accept="image/*" multiple style="display: none;" />
       </div>
 
-      <!-- After Photo -->
+      <!-- After Photos -->
       <div>
-        <h4 style="margin-bottom: 12px;">After Photo</h4>
-        <div id="afterPhotoPreview" style="display: none; margin-bottom: 12px;">
-          <img id="afterPhotoImg" style="max-width: 100%; max-height: 300px; border-radius: 10px; border: 1px solid var(--border);" />
-          <div style="margin-top: 8px; font-size: 14px; color: var(--muted);" id="afterPhotoInfo"></div>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+          <h4 style="margin: 0;">After Photos (<span id="afterPhotoCount">0</span>)</h4>
+          <div style="display: flex; gap: 8px;">
+            <button id="takeAfterPhoto" class="btn accent" style="padding: 8px 16px;">📷 Take Photo</button>
+            <button id="uploadAfterPhoto" class="btn" style="padding: 8px 16px;">📁 Upload</button>
+          </div>
         </div>
-        <div class="row">
-          <button id="takeAfterPhoto" class="btn accent">📷 Take After Photo</button>
-          <button id="uploadAfterPhoto" class="btn">📁 Upload from Gallery</button>
-          <button id="clearAfterPhoto" class="btn" style="display: none;">✕ Clear</button>
-        </div>
-        <input type="file" id="afterPhotoInput" accept="image/*" style="display: none;" />
+        <div id="afterPhotosGrid" style="
+          display: grid;
+          grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+          gap: 12px;
+          margin-top: 12px;
+        "></div>
+        <input type="file" id="afterPhotoInput" accept="image/*" multiple style="display: none;" />
       </div>
     </div>
 
@@ -490,7 +496,6 @@ function setupEventListeners() {
 function setupPhotoButtons(type) {
   const takeBtn = document.getElementById(`take${type.charAt(0).toUpperCase() + type.slice(1)}Photo`);
   const uploadBtn = document.getElementById(`upload${type.charAt(0).toUpperCase() + type.slice(1)}Photo`);
-  const clearBtn = document.getElementById(`clear${type.charAt(0).toUpperCase() + type.slice(1)}Photo`);
   const fileInput = document.getElementById(`${type}PhotoInput`);
 
   if (takeBtn) {
@@ -503,21 +508,11 @@ function setupPhotoButtons(type) {
 
   if (fileInput) {
     fileInput.addEventListener('change', async (e) => {
-      const file = e.target.files?.[0];
-      if (file) {
+      const files = Array.from(e.target.files || []);
+      for (const file of files) {
         await handlePhotoSelected(file, type);
       }
-    });
-  }
-
-  if (clearBtn) {
-    clearBtn.addEventListener('click', () => {
-      if (type === 'before') {
-        beforePhoto = null;
-      } else {
-        afterPhoto = null;
-      }
-      updateUI();
+      e.target.value = ''; // Reset input to allow selecting same file again
     });
   }
 }
@@ -574,6 +569,82 @@ async function openCamera(type) {
   }
 }
 
+function renderPhotoGrid(type) {
+  const photos = type === 'before' ? beforePhotos : afterPhotos;
+  const grid = document.getElementById(`${type}PhotosGrid`);
+  const countSpan = document.getElementById(`${type}PhotoCount`);
+
+  if (!grid || !countSpan) return;
+
+  countSpan.textContent = photos.length;
+
+  if (photos.length === 0) {
+    grid.innerHTML = '<p style="color: var(--muted); grid-column: 1/-1; text-align: center; padding: 20px;">No photos yet</p>';
+    return;
+  }
+
+  grid.innerHTML = photos.map(photo => `
+    <div style="position: relative; aspect-ratio: 1; border-radius: 8px; overflow: hidden; border: 2px solid var(--border);">
+      <img src="${photo.url}" style="width: 100%; height: 100%; object-fit: cover;" />
+      <button
+        class="remove-photo-btn"
+        data-photo-id="${photo.id}"
+        data-photo-type="${type}"
+        style="
+          position: absolute;
+          top: 4px;
+          right: 4px;
+          background: rgba(0, 0, 0, 0.7);
+          color: white;
+          border: none;
+          border-radius: 50%;
+          width: 24px;
+          height: 24px;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 16px;
+          line-height: 1;
+        "
+        title="Remove photo"
+      >×</button>
+      <div style="
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        background: linear-gradient(transparent, rgba(0,0,0,0.7));
+        color: white;
+        font-size: 10px;
+        padding: 4px;
+        text-align: center;
+      ">${photo.width}×${photo.height}</div>
+    </div>
+  `).join('');
+
+  // Add remove button listeners
+  grid.querySelectorAll('.remove-photo-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const photoId = parseFloat(btn.getAttribute('data-photo-id'));
+      const photoType = btn.getAttribute('data-photo-type');
+      removePhoto(photoId, photoType);
+    });
+  });
+}
+
+function removePhoto(photoId, type) {
+  if (type === 'before') {
+    beforePhotos = beforePhotos.filter(p => p.id !== photoId);
+  } else {
+    afterPhotos = afterPhotos.filter(p => p.id !== photoId);
+  }
+  renderPhotoGrid(type);
+  updateUI();
+  utils.toast('Photo removed', 'success');
+}
+
 async function handlePhotoSelected(file, type) {
   try {
     // Strip EXIF data (privacy)
@@ -585,26 +656,27 @@ async function handlePhotoSelected(file, type) {
     // Get dimensions
     const dimensions = await utils.getImageDimensions(finalFile);
 
-    // Store photo
+    // Create photo object with preview URL
+    const photoObj = {
+      file: finalFile,
+      url: URL.createObjectURL(finalFile),
+      width: dimensions.width,
+      height: dimensions.height,
+      size: finalFile.size,
+      id: Date.now() + Math.random() // Unique ID for removal
+    };
+
+    // Add to appropriate array
     if (type === 'before') {
-      beforePhoto = { file: finalFile, ...dimensions };
+      beforePhotos.push(photoObj);
     } else {
-      afterPhoto = { file: finalFile, ...dimensions };
+      afterPhotos.push(photoObj);
     }
 
-    // Show preview
-    const preview = document.getElementById(`${type}PhotoPreview`);
-    const img = document.getElementById(`${type}PhotoImg`);
-    const info = document.getElementById(`${type}PhotoInfo`);
-
-    if (preview && img && info) {
-      img.src = URL.createObjectURL(finalFile);
-      info.textContent = `${dimensions.width}×${dimensions.height} • ${utils.formatFileSize(finalFile.size)}`;
-      preview.style.display = 'block';
-    }
-
+    // Render photo grid
+    renderPhotoGrid(type);
     updateUI();
-    utils.toast(`${type === 'before' ? 'Before' : 'After'} photo ready`, 'success');
+    utils.toast(`${type === 'before' ? 'Before' : 'After'} photo added`, 'success');
 
   } catch (err) {
     utils.toast('Failed to process photo: ' + err.message, 'error');
@@ -618,8 +690,13 @@ async function handleSubmit() {
   await utils.withLock(submitBtn, async () => {
     try {
       // Validation
-      if (!selectedCustomer || !selectedTreatment || !consentConfirmed || !beforePhoto || !afterPhoto) {
+      if (!selectedCustomer || !selectedTreatment || !consentConfirmed) {
         utils.toast('Please complete all required fields', 'error');
+        return;
+      }
+
+      if (beforePhotos.length === 0 || afterPhotos.length === 0) {
+        utils.toast('Please upload at least one before and one after photo', 'error');
         return;
       }
 
@@ -629,7 +706,7 @@ async function handleSubmit() {
         cust_id: selectedCustomer.cust_id,
         staff_user: user.id,
         method: 'digital',
-        consent_type: 'marketing',
+        consent_type: 'media_release',
         source: 'emr',
         channel: 'in_person'
       });
@@ -649,18 +726,24 @@ async function handleSubmit() {
 
       currentEncounterId = encounter.encounter_id;
 
-      // Upload before photo
-      await uploadPhoto(beforePhoto.file, 'before', encounter.encounter_id);
+      // Upload all before photos
+      utils.toast(`Uploading ${beforePhotos.length} before photo(s)...`, 'info');
+      for (const photo of beforePhotos) {
+        await uploadPhoto(photo.file, 'before', encounter.encounter_id);
+      }
 
-      // Upload after photo
-      await uploadPhoto(afterPhoto.file, 'after', encounter.encounter_id);
+      // Upload all after photos
+      utils.toast(`Uploading ${afterPhotos.length} after photo(s)...`, 'info');
+      for (const photo of afterPhotos) {
+        await uploadPhoto(photo.file, 'after', encounter.encounter_id);
+      }
 
       // Update encounter status to pending_approval
       await api.updateEncounter(encounter.encounter_id, {
         status: 'pending_approval'
       });
 
-      utils.toast('Photos submitted for approval!', 'success');
+      utils.toast(`${beforePhotos.length + afterPhotos.length} photos submitted for approval!`, 'success');
 
       // Reset form
       setTimeout(() => {
@@ -726,21 +809,9 @@ function updateUI() {
     detailsSection.style.display = selectedCustomer && selectedTreatment && consentConfirmed ? 'block' : 'none';
   }
 
-  // Show submit only when both photos are ready
+  // Show submit only when at least one before and one after photo exist
   if (submitSection) {
-    submitSection.style.display = beforePhoto && afterPhoto ? 'block' : 'none';
-  }
-
-  // Update clear buttons
-  const clearBeforeBtn = document.getElementById('clearBeforePhoto');
-  const clearAfterBtn = document.getElementById('clearAfterPhoto');
-
-  if (clearBeforeBtn) {
-    clearBeforeBtn.style.display = beforePhoto ? 'inline-block' : 'none';
-  }
-
-  if (clearAfterBtn) {
-    clearAfterBtn.style.display = afterPhoto ? 'inline-block' : 'none';
+    submitSection.style.display = beforePhotos.length > 0 && afterPhotos.length > 0 ? 'block' : 'none';
   }
 }
 
