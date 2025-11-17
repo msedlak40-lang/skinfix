@@ -13,6 +13,7 @@ let consentConfirmed = false;
 let beforePhotos = [];
 let afterPhotos = [];
 let currentEncounterId = null;
+let isAddingAfterPhotos = false; // Flag to indicate we're adding after photos to existing encounter
 
 export async function render() {
   const treatmentSelectHTML = await components.createTreatmentSelect();
@@ -86,6 +87,16 @@ export async function render() {
             <button id="cancelNewCustomer" class="btn">Cancel</button>
           </div>
         </div>
+      </div>
+    </div>
+
+    <!-- Pending Encounters (needs after photos) -->
+    <div class="card" id="pendingEncountersSection" style="display: none;">
+      <h3>📋 Encounters Awaiting After Photos</h3>
+      <p style="color: var(--muted); margin-bottom: 12px;">This customer has treatments waiting for after photos:</p>
+      <div id="pendingEncountersList"></div>
+      <div style="margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border);">
+        <button id="startNewEncounter" class="btn accent">+ Start New Treatment</button>
       </div>
     </div>
 
@@ -232,12 +243,17 @@ export async function render() {
     <div class="card" id="submitSection" style="display: none;">
       <div class="row" style="justify-content: space-between; align-items: center;">
         <div>
-          <h3 style="margin: 0;">Ready to Submit</h3>
-          <p style="color: var(--muted); margin: 4px 0 0 0;">Photos will be sent to approval queue</p>
+          <h3 style="margin: 0;" id="submitTitle">Ready to Submit</h3>
+          <p style="color: var(--muted); margin: 4px 0 0 0;" id="submitDescription">Photos will be sent to approval queue</p>
         </div>
-        <button id="submitEncounter" class="btn accent" style="padding: 14px 24px; font-size: 16px;">
-          Submit for Approval
-        </button>
+        <div style="display: flex; gap: 12px;">
+          <button id="saveBeforePhotos" class="btn accent" style="padding: 14px 24px; font-size: 16px; display: none;">
+            💾 Save Before Photos
+          </button>
+          <button id="submitForApproval" class="btn accent" style="padding: 14px 24px; font-size: 16px; display: none;">
+            ✅ Submit for Approval
+          </button>
+        </div>
       </div>
     </div>
 
@@ -372,18 +388,114 @@ function setupCustomerSearch() {
     searchInput.value = '';
   });
 
-  function selectCustomer(customer) {
+  async function selectCustomer(customer) {
     selectedCustomer = customer;
     document.getElementById('selectedCustomerName').textContent = customer.name;
     document.getElementById('selectedCustomerPhone').textContent = utils.formatPhone(customer.phone);
     searchInput.parentElement.style.display = 'none';
     selectedDiv.style.display = 'block';
     resultsDiv.style.display = 'none';
+
+    // Load pending encounters for this customer
+    await loadPendingEncounters(customer.cust_id);
+
     updateUI();
   }
 }
 
+async function loadPendingEncounters(cust_id) {
+  try {
+    // Get encounters with status 'pending_after_photos'
+    const encounters = await api.getEncounters({
+      cust_id,
+      status: 'pending_after_photos',
+      limit: 10
+    });
+
+    const pendingSection = document.getElementById('pendingEncountersSection');
+    const pendingList = document.getElementById('pendingEncountersList');
+
+    if (!pendingSection || !pendingList) return;
+
+    if (encounters.length === 0) {
+      pendingSection.style.display = 'none';
+      return;
+    }
+
+    // Show pending encounters
+    pendingSection.style.display = 'block';
+    pendingList.innerHTML = encounters.map(enc => `
+      <div
+        class="pending-encounter-item"
+        data-encounter-id="${enc.encounter_id}"
+        data-treatment-id="${enc.treatment_id}"
+        data-treatment-name="${utils.escapeHTML(enc.treatment_name || 'Unknown')}"
+        style="
+          padding: 12px;
+          border: 1px solid var(--border);
+          border-radius: 10px;
+          margin-bottom: 8px;
+          cursor: pointer;
+          transition: all 0.2s;
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+        "
+        onmouseover="this.style.borderColor='var(--accent)'"
+        onmouseout="this.style.borderColor='var(--border)'"
+      >
+        <div>
+          <strong>${utils.escapeHTML(enc.treatment_name || 'Unknown Treatment')}</strong>
+          <div style="font-size: 14px; color: var(--muted);">
+            ${utils.formatRelativeTime(enc.created_at)} • ${enc.before_photo_count || 0} before photo(s)
+          </div>
+        </div>
+        <button class="btn accent" style="padding: 8px 16px;">Add After Photos →</button>
+      </div>
+    `).join('');
+
+    // Add click handlers to pending encounters
+    document.querySelectorAll('.pending-encounter-item').forEach(item => {
+      item.addEventListener('click', () => {
+        const encounterId = item.getAttribute('data-encounter-id');
+        const treatmentId = item.getAttribute('data-treatment-id');
+        const treatmentName = item.getAttribute('data-treatment-name');
+        loadExistingEncounter(encounterId, treatmentId, treatmentName);
+      });
+    });
+
+  } catch (error) {
+    console.error('Failed to load pending encounters:', error);
+  }
+}
+
+function loadExistingEncounter(encounterId, treatmentId, treatmentName) {
+  // Set mode to adding after photos
+  isAddingAfterPhotos = true;
+  currentEncounterId = encounterId;
+  selectedTreatment = treatmentId;
+
+  // Hide pending encounters section
+  document.getElementById('pendingEncountersSection').style.display = 'none';
+
+  // Skip to photo upload section
+  consentConfirmed = true; // Consent already exists from before photos
+
+  // Show only after photo section
+  utils.toast(`Adding after photos to ${treatmentName} treatment`, 'info');
+
+  updateUI();
+}
+
 function setupEventListeners() {
+  // Start new encounter button
+  document.getElementById('startNewEncounter')?.addEventListener('click', () => {
+    document.getElementById('pendingEncountersSection').style.display = 'none';
+    isAddingAfterPhotos = false;
+    currentEncounterId = null;
+    updateUI();
+  });
+
   // Treatment selection
   const treatmentSelect = document.getElementById('treatmentSelect');
   if (treatmentSelect) {
@@ -486,10 +598,16 @@ function setupEventListeners() {
   setupPhotoButtons('before');
   setupPhotoButtons('after');
 
-  // Submit button
-  const submitBtn = document.getElementById('submitEncounter');
-  if (submitBtn) {
-    submitBtn.addEventListener('click', handleSubmit);
+  // Save Before Photos button
+  const saveBeforeBtn = document.getElementById('saveBeforePhotos');
+  if (saveBeforeBtn) {
+    saveBeforeBtn.addEventListener('click', handleSaveBeforePhotos);
+  }
+
+  // Submit For Approval button
+  const submitApprovalBtn = document.getElementById('submitForApproval');
+  if (submitApprovalBtn) {
+    submitApprovalBtn.addEventListener('click', handleSubmitForApproval);
   }
 }
 
@@ -673,6 +791,9 @@ async function handlePhotoSelected(file, type) {
       afterPhotos.push(photoObj);
     }
 
+    // Save to camera roll (for iPad/mobile)
+    await savePhotoToCameraRoll(finalFile, type);
+
     // Render photo grid
     renderPhotoGrid(type);
     updateUI();
@@ -684,10 +805,33 @@ async function handlePhotoSelected(file, type) {
   }
 }
 
-async function handleSubmit() {
-  const submitBtn = document.getElementById('submitEncounter');
+async function savePhotoToCameraRoll(file, type) {
+  try {
+    // Create a download link to trigger save to Photos on iOS
+    const url = URL.createObjectURL(file);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${selectedCustomer.name.replace(/\s+/g, '_')}_${type}_${Date.now()}.jpg`;
 
-  await utils.withLock(submitBtn, async () => {
+    // Trigger download (iOS will prompt to save to Photos)
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    // Small delay to show the toast
+    await new Promise(resolve => setTimeout(resolve, 500));
+    utils.toast(`Photo saved to device (check Downloads/Photos)`, 'info');
+  } catch (err) {
+    console.warn('Could not auto-save to camera roll:', err);
+    // Don't show error to user, it's a nice-to-have feature
+  }
+}
+
+async function handleSaveBeforePhotos() {
+  const saveBtn = document.getElementById('saveBeforePhotos');
+
+  await utils.withLock(saveBtn, async () => {
     try {
       // Validation
       if (!selectedCustomer || !selectedTreatment || !consentConfirmed) {
@@ -695,8 +839,8 @@ async function handleSubmit() {
         return;
       }
 
-      if (beforePhotos.length === 0 || afterPhotos.length === 0) {
-        utils.toast('Please upload at least one before and one after photo', 'error');
+      if (beforePhotos.length === 0) {
+        utils.toast('Please upload at least one before photo', 'error');
         return;
       }
 
@@ -721,7 +865,8 @@ async function handleSubmit() {
         treatment_id: selectedTreatment,
         consent_id: consent.consent_id,
         private_notes: privateNotes,
-        custom_tags: customTags
+        custom_tags: customTags,
+        status: 'pending_after_photos' // Key difference!
       });
 
       currentEncounterId = encounter.encounter_id;
@@ -732,23 +877,108 @@ async function handleSubmit() {
         await uploadPhoto(photo.file, 'before', encounter.encounter_id);
       }
 
-      // Upload all after photos
-      utils.toast(`Uploading ${afterPhotos.length} after photo(s)...`, 'info');
-      for (const photo of afterPhotos) {
-        await uploadPhoto(photo.file, 'after', encounter.encounter_id);
-      }
-
-      // Update encounter status to pending_approval
-      await api.updateEncounter(encounter.encounter_id, {
-        status: 'pending_approval'
-      });
-
-      utils.toast(`${beforePhotos.length + afterPhotos.length} photos submitted for approval!`, 'success');
+      utils.toast(`Before photos saved! Come back later to add after photos.`, 'success');
 
       // Reset form
       setTimeout(() => {
         window.router.navigate('/media/upload');
-        location.reload(); // Simple reset for now
+        location.reload();
+      }, 2000);
+
+    } catch (err) {
+      utils.toast('Failed to save before photos: ' + err.message, 'error');
+      console.error('Save before photos error:', err);
+    }
+  });
+}
+
+async function handleSubmitForApproval() {
+  const submitBtn = document.getElementById('submitForApproval');
+
+  await utils.withLock(submitBtn, async () => {
+    try {
+      // Two scenarios:
+      // 1. Adding after photos to existing encounter (isAddingAfterPhotos = true)
+      // 2. Creating new encounter with both before and after photos
+
+      if (isAddingAfterPhotos) {
+        // Scenario 1: Adding after photos only
+        if (afterPhotos.length === 0) {
+          utils.toast('Please upload at least one after photo', 'error');
+          return;
+        }
+
+        // Upload all after photos to existing encounter
+        utils.toast(`Uploading ${afterPhotos.length} after photo(s)...`, 'info');
+        for (const photo of afterPhotos) {
+          await uploadPhoto(photo.file, 'after', currentEncounterId);
+        }
+
+        // Update encounter status to pending_approval
+        await api.updateEncounter(currentEncounterId, {
+          status: 'pending_approval'
+        });
+
+        utils.toast(`${afterPhotos.length} after photos added! Submitted for approval.`, 'success');
+
+      } else {
+        // Scenario 2: New encounter with both before and after photos
+        if (!selectedCustomer || !selectedTreatment || !consentConfirmed) {
+          utils.toast('Please complete all required fields', 'error');
+          return;
+        }
+
+        if (beforePhotos.length === 0 || afterPhotos.length === 0) {
+          utils.toast('Please upload at least one before and one after photo', 'error');
+          return;
+        }
+
+        // Create consent record
+        const user = await api.getUser();
+        const consent = await api.createConsent({
+          cust_id: selectedCustomer.cust_id,
+          staff_user: user.id,
+          method: 'digital',
+          consent_type: 'media_release',
+          source: 'emr',
+          channel: 'in_person'
+        });
+
+        // Create encounter
+        const privateNotes = document.getElementById('privateNotes')?.value.trim() || null;
+        const customTagsStr = document.getElementById('customTags')?.value.trim() || '';
+        const customTags = customTagsStr ? customTagsStr.split(',').map(t => t.trim()).filter(Boolean) : [];
+
+        const encounter = await api.createEncounter({
+          cust_id: selectedCustomer.cust_id,
+          treatment_id: selectedTreatment,
+          consent_id: consent.consent_id,
+          private_notes: privateNotes,
+          custom_tags: customTags,
+          status: 'pending_approval'
+        });
+
+        currentEncounterId = encounter.encounter_id;
+
+        // Upload all before photos
+        utils.toast(`Uploading ${beforePhotos.length} before photo(s)...`, 'info');
+        for (const photo of beforePhotos) {
+          await uploadPhoto(photo.file, 'before', encounter.encounter_id);
+        }
+
+        // Upload all after photos
+        utils.toast(`Uploading ${afterPhotos.length} after photo(s)...`, 'info');
+        for (const photo of afterPhotos) {
+          await uploadPhoto(photo.file, 'after', encounter.encounter_id);
+        }
+
+        utils.toast(`${beforePhotos.length + afterPhotos.length} photos submitted for approval!`, 'success');
+      }
+
+      // Reset form
+      setTimeout(() => {
+        window.router.navigate('/media/upload');
+        location.reload();
       }, 1500);
 
     } catch (err) {
@@ -792,26 +1022,73 @@ function updateUI() {
   const photoSection = document.getElementById('photoSection');
   const detailsSection = document.getElementById('detailsSection');
   const submitSection = document.getElementById('submitSection');
+  const saveBeforeBtn = document.getElementById('saveBeforePhotos');
+  const submitApprovalBtn = document.getElementById('submitForApproval');
+  const submitTitle = document.getElementById('submitTitle');
+  const submitDescription = document.getElementById('submitDescription');
 
-  if (treatmentSection) {
-    treatmentSection.style.display = selectedCustomer ? 'block' : 'none';
-  }
+  if (isAddingAfterPhotos) {
+    // Adding after photos to existing encounter
+    treatmentSection.style.display = 'none';
+    consentSection.style.display = 'none';
+    photoSection.style.display = 'block';
+    detailsSection.style.display = 'block';
 
-  if (consentSection) {
-    consentSection.style.display = selectedCustomer && selectedTreatment ? 'block' : 'none';
-  }
+    // Show submit when we have after photos
+    if (submitSection && afterPhotos.length > 0) {
+      submitSection.style.display = 'block';
+      if (saveBeforeBtn) saveBeforeBtn.style.display = 'none';
+      if (submitApprovalBtn) submitApprovalBtn.style.display = 'inline-block';
+      if (submitTitle) submitTitle.textContent = 'Ready to Submit for Approval';
+      if (submitDescription) submitDescription.textContent = `${afterPhotos.length} after photo(s) ready`;
+    } else {
+      submitSection.style.display = 'none';
+    }
 
-  if (photoSection) {
-    photoSection.style.display = selectedCustomer && selectedTreatment && consentConfirmed ? 'block' : 'none';
-  }
+  } else {
+    // Normal workflow: new encounter
+    if (treatmentSection) {
+      treatmentSection.style.display = selectedCustomer ? 'block' : 'none';
+    }
 
-  if (detailsSection) {
-    detailsSection.style.display = selectedCustomer && selectedTreatment && consentConfirmed ? 'block' : 'none';
-  }
+    if (consentSection) {
+      consentSection.style.display = selectedCustomer && selectedTreatment ? 'block' : 'none';
+    }
 
-  // Show submit only when at least one before and one after photo exist
-  if (submitSection) {
-    submitSection.style.display = beforePhotos.length > 0 && afterPhotos.length > 0 ? 'block' : 'none';
+    if (photoSection) {
+      photoSection.style.display = selectedCustomer && selectedTreatment && consentConfirmed ? 'block' : 'none';
+    }
+
+    if (detailsSection) {
+      detailsSection.style.display = selectedCustomer && selectedTreatment && consentConfirmed ? 'block' : 'none';
+    }
+
+    // Determine which submit button to show
+    if (submitSection) {
+      const hasBeforePhotos = beforePhotos.length > 0;
+      const hasAfterPhotos = afterPhotos.length > 0;
+
+      if (hasBeforePhotos && hasAfterPhotos) {
+        // Both before and after: show "Submit for Approval"
+        submitSection.style.display = 'block';
+        if (saveBeforeBtn) saveBeforeBtn.style.display = 'none';
+        if (submitApprovalBtn) submitApprovalBtn.style.display = 'inline-block';
+        if (submitTitle) submitTitle.textContent = 'Ready to Submit for Approval';
+        if (submitDescription) submitDescription.textContent = `${beforePhotos.length + afterPhotos.length} photos ready`;
+
+      } else if (hasBeforePhotos && !hasAfterPhotos) {
+        // Only before photos: show "Save Before Photos"
+        submitSection.style.display = 'block';
+        if (saveBeforeBtn) saveBeforeBtn.style.display = 'inline-block';
+        if (submitApprovalBtn) submitApprovalBtn.style.display = 'none';
+        if (submitTitle) submitTitle.textContent = 'Save Before Photos';
+        if (submitDescription) submitDescription.textContent = 'Come back later to add after photos';
+
+      } else {
+        // No photos yet
+        submitSection.style.display = 'none';
+      }
+    }
   }
 }
 
